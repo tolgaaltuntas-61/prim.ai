@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prim Alarm Sistemi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#11151b;
+    --panel:#1a212a;
+    --panel-2:#212a35;
+    --line:#2b3542;
+    --line-soft:#232b36;
+    --text:#e8ecf1;
+    --text-dim:#8b96a5;
+    --text-faint:#57626f;
+    --safe:#4fb286;
+    --safe-dim:rgba(79,178,134,.14);
+    --warn:#e0a030;
+    --warn-dim:rgba(224,160,48,.14);
+    --crit:#e0554f;
+    --crit-dim:rgba(224,85,79,.14);
+    --grotesk:'Space Grotesk',sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --body:'Inter',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:100vh;padding:28px 20px 60px;}
+  .wrap{max-width:1160px;margin:0 auto;}
+
+  .save-error{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    background:var(--crit-dim);border:1px solid var(--crit);color:var(--crit);
+    padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px;
+  }
+  .save-error button{width:auto;padding:6px 12px;font-size:12px;background:transparent;border-color:var(--crit);color:var(--crit);}
+  .save-error button:hover{background:rgba(224,85,79,.12);}
+
+  .header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:22px;}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--text-faint);text-transform:uppercase;margin-bottom:6px;}
+  h1{font-family:var(--grotesk);font-weight:700;font-size:26px;margin:0;letter-spacing:-.01em;}
+  .header-right{font-family:var(--mono);font-size:12px;color:var(--text-dim);text-align:right;}
+  .status-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:11px;font-family:var(--mono);border:1px solid var(--line);color:var(--text-dim);margin-top:6px;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
+  .dot.safe{background:var(--safe);}
+  .dot.warn{background:var(--warn);}
+  .dot.crit{background:var(--crit);box-shadow:0 0 0 0 rgba(224,85,79,.5);animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(224,85,79,.55);}70%{box-shadow:0 0 0 8px rgba(224,85,79,0);}100%{box-shadow:0 0 0 0 rgba(224,85,79,0);}}
+  @media (prefers-reduced-motion: reduce){ .dot.crit{animation:none;} }
+
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:18px;}
+  @media (max-width:860px){.grid{grid-template-columns:1fr;}}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;}
+  .panel + .panel{margin-top:18px;}
+  .panel-title{font-family:var(--grotesk);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin:0 0 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .panel-title .tag{font-family:var(--mono);font-size:10px;text-transform:none;letter-spacing:0;color:#8fb4e8;background:rgba(91,143,217,.12);padding:2px 8px;border-radius:10px;}
+
+  label{display:block;font-size:12px;color:var(--text-dim);margin-bottom:5px;}
+  input[type=text],input[type=number]{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);font-family:var(--mono);font-size:13px;padding:9px 10px;border-radius:6px;margin-bottom:14px;}
+  input:focus,select:focus,button:focus-visible{outline:2px solid #5b8fd9;outline-offset:1px;}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+  select{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);font-family:var(--mono);font-size:13px;padding:9px 10px;border-radius:6px;margin-bottom:14px;}
+
+  .drop{border:1.5px dashed var(--line);border-radius:8px;padding:22px 14px;text-align:center;cursor:pointer;color:var(--text-dim);font-size:13px;transition:border-color .15s, background .15s;margin-bottom:12px;}
+  .drop:hover,.drop.drag{border-color:#5b8fd9;background:rgba(91,143,217,.06);}
+  .drop b{color:var(--text);}
+  .filename{font-family:var(--mono);font-size:12px;color:var(--safe);margin:-4px 0 12px;word-break:break-all;}
+
+  button{font-family:var(--body);font-weight:600;font-size:13px;cursor:pointer;border-radius:7px;border:1px solid var(--line);padding:10px 14px;background:var(--panel-2);color:var(--text);width:100%;transition:border-color .15s, background .15s;}
+  button:hover:not(:disabled){border-color:#5b8fd9;}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  button.primary{background:#2c4c78;border-color:#2c4c78;color:#eaf1ff;}
+  button.primary:hover:not(:disabled){background:#345a8e;}
+  button.ghost{background:transparent;}
+  button.small{width:auto;padding:6px 11px;font-size:12px;}
+  button.danger{color:var(--crit);}
+  button.danger:hover:not(:disabled){border-color:var(--crit);}
+
+  .hint{font-size:11px;color:var(--text-faint);margin-top:-8px;margin-bottom:14px;line-height:1.5;}
+
+  .scale-row{display:grid;grid-template-columns:1fr 1.2fr 0.55fr auto;gap:6px;align-items:center;margin-bottom:8px;}
+  .scale-row input{margin-bottom:0;padding:7px 8px;font-size:12px;}
+  .scale-row .rm{width:26px;height:26px;padding:0;border-radius:6px;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--text-faint);}
+  .scale-labels{display:grid;grid-template-columns:1fr 1.2fr 0.55fr auto;gap:6px;margin-bottom:6px;}
+  .scale-grade{text-align:center;font-family:var(--mono);font-size:11px;color:var(--text-dim);}
+  .scale-labels span{font-size:10px;color:var(--text-faint);font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em;}
+  #scaleRows{max-height:320px;overflow-y:auto;padding-right:4px;}
+
+  .gauge-card{display:flex;flex-wrap:wrap;gap:24px;align-items:center;}
+  .gauge-readout{flex:1;min-width:230px;}
+  .readout-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:13px;}
+  .readout-row:last-child{border-bottom:none;}
+  .readout-row .k{color:var(--text-dim);}
+  .readout-row .v{font-family:var(--mono);font-weight:600;}
+  .v.safe{color:var(--safe);}
+  .v.warn{color:var(--warn);}
+  .v.crit{color:var(--crit);}
+
+  .level-banner{font-family:var(--mono);font-size:12px;letter-spacing:.04em;padding:9px 12px;border-radius:6px;margin-top:14px;}
+  .level-banner.safe{background:var(--safe-dim);color:var(--safe);}
+  .level-banner.warn{background:var(--warn-dim);color:var(--warn);}
+  .level-banner.crit{background:var(--crit-dim);color:var(--crit);}
+  .level-banner.idle{background:var(--panel-2);color:var(--text-faint);}
+
+  .rec-list{list-style:none;margin:0;padding:0;}
+  .rec-list li{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-soft);font-size:13px;line-height:1.5;}
+  .rec-list li:last-child{border-bottom:none;}
+  .rec-list li::before{content:"→";color:var(--text-faint);flex-shrink:0;font-family:var(--mono);}
+
+  .ai-box{margin-top:14px;padding:14px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);font-size:13px;line-height:1.6;white-space:pre-wrap;}
+  .ai-tag{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:#8fb4e8;background:rgba(91,143,217,.12);padding:2px 7px;border-radius:4px;margin-bottom:8px;}
+
+  .metric-picker{max-height:150px;overflow-y:auto;border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-bottom:14px;background:var(--panel-2);}
+  .metric-picker label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);margin-bottom:0;padding:4px 0;cursor:pointer;}
+  .metric-picker input[type=checkbox]{width:auto;margin:0;}
+  .metric-picker .none{color:var(--text-faint);font-size:12px;}
+
+  .metric-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+  .metric-card{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:12px;}
+  .metric-card .mname{font-size:11px;color:var(--text-dim);margin-bottom:6px;line-height:1.35;min-height:28px;}
+  .metric-card .mval{font-family:var(--mono);font-size:19px;font-weight:600;}
+  .metric-card .mdelta{font-family:var(--mono);font-size:11px;margin-top:4px;color:var(--text-faint);}
+  .metric-card .mdelta.up{color:var(--warn);}
+  .metric-card .mdelta.down{color:var(--safe);}
+
+  .hist-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+  .hist-sub{font-size:11px;color:var(--text-faint);margin-bottom:14px;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th{text-align:left;color:var(--text-faint);font-weight:600;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--line);padding:8px 6px;}
+  td{padding:9px 6px;border-bottom:1px solid var(--line-soft);font-family:var(--mono);}
+  tr:last-child td{border-bottom:none;}
+  .badge{display:inline-block;width:8px;height:8px;border-radius:50%;}
+  .empty{color:var(--text-faint);font-size:13px;text-align:center;padding:30px 0;}
+  .mt-detail-scroll{max-height:280px;overflow-y:auto;}
+  .mt-detail-scroll table{font-size:12px;}
+  .mt-detail-note{font-size:11px;color:var(--text-faint);margin-top:8px;}
+  .grade-chart{overflow-x:auto;margin-bottom:16px;padding-top:4px;}
+  .dist-subhead{font-family:var(--mono);font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;}
+  .dist-subhead:first-child{margin-top:0;}
+
+  .print-only{display:none;}
+
+  @media print{
+    :root{
+      --bg:#ffffff; --panel:#ffffff; --panel-2:#f4f6f8;
+      --line:#d7dde3; --line-soft:#e7ebef;
+      --text:#14181d; --text-dim:#3f4a56; --text-faint:#6b7684;
+    }
+    body{padding:0;}
+    .save-error,
+    .grid > div:first-child,
+    header .header-right button,
+    .grid button,
+    #dropZone{ display:none !important; }
+    .print-only{ display:block; margin-bottom:14px; font-family:var(--mono); font-size:12px; color:#000; }
+    main.grid{ display:block; }
+    .panel{ border:1px solid var(--line); box-shadow:none; break-inside:avoid; }
+    .mt-detail-scroll, .metric-picker{ max-height:none !important; overflow:visible !important; }
+    #chartHolder{ overflow-x:visible !important; }
+    #chartHolder svg{ max-width:100% !important; height:auto !important; }
+    table tr{ break-inside:avoid; }
+    .dot.crit{ animation:none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="save-error" id="saveErrorBanner" style="display:none;" role="alert">
+    <span class="msg">Kaydedilemedi.</span>
+    <button class="small" id="retrySaveBtn" type="button">Tekrar Dene</button>
+  </div>
+
+  <header class="header">
+    <div>
+      <div class="eyebrow">Tahsilat · Performans Yönetimi</div>
+      <h1>Prim Alarm Sistemi</h1>
+    </div>
+    <div class="header-right">
+      Karne kanaat ortalaması hedeften saptığında<br/>prim etkisini ve aksiyonu gösterir.
+      <div class="status-chip"><span class="dot" id="statusDot" aria-hidden="true"></span><span id="statusText" role="status" aria-live="polite">Veri bekleniyor</span></div>
+      <button class="ghost small" id="pdfBtn" type="button" disabled style="margin-top:10px;width:auto;">Durum Özetini PDF İndir</button>
+    </div>
+  </header>
+
+  <div class="print-only" id="printMeta"></div>
+
+  <main class="grid">
+    <!-- LEFT COLUMN -->
+    <div>
+      <div class="panel">
+        <h2 class="panel-title">Prim Segmenti</h2>
+        <label for="segmentSelect">Aktif Segment</label>
+        <select id="segmentSelect"></select>
+        <div class="field-row" style="margin-bottom:14px;">
+          <button class="ghost small" id="addSegmentBtn" type="button">+ Yeni Segment</button>
+          <button class="ghost small danger" id="deleteSegmentBtn" type="button">Segmenti Sil</button>
+        </div>
+
+        <label for="targetAvg">Hedef Ortalama (1–5)</label>
+        <input type="number" id="targetAvg" step="0.01" value="3.5" />
+
+        <label for="targetPrim">Hedef Ortalamada Toplam Prim (TL)</label>
+        <input type="number" id="targetPrim" step="1000" value="90000" />
+
+        <label for="tolerance">Tolerans (± % prim sapması)</label>
+        <input type="number" id="tolerance" step="0.5" value="2" />
+        <div class="hint">1× tolerans içi yeşil, 2× tolerans içi sarı, ötesi kırmızı alarm. Her segmentin kendi hedefi ve toleransı vardır.</div>
+
+        <label for="periodLabel">Dönem Etiketi</label>
+        <input type="text" id="periodLabel" value="" />
+
+        <button class="ghost small" id="saveSettingsBtn" type="button" style="width:100%;">Ayarları Kaydet</button>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel-title">Prim Skalası <span class="tag" id="scaleSegmentTag"></span></h2>
+        <div class="hint">Her satır bir eşik puanı ve o eşikten bir sonraki eşiğe kadar geçerli sabit prim tutarını temsil eder (örn. 3,27 puan alan bir satır, 3,2 eşiğinin primini kullanır). Bu skala yalnızca yukarıda seçili segment için geçerli — her segment kendi skalasını ayrı tutar.</div>
+        <div class="scale-labels"><span>Not (Eşik)</span><span>Prim (TL)</span><span>Harf</span><span></span></div>
+        <div id="scaleRows"></div>
+        <button class="ghost small" id="addScaleRowBtn" type="button" style="width:100%;margin-bottom:10px;">+ Satır Ekle</button>
+        <button class="ghost small" id="saveScaleBtn" type="button" style="width:100%;">Skalayı Kaydet</button>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel-title">Karne Kanaat Yükle</h2>
+        <div class="drop" id="dropZone" role="button" tabindex="0" aria-label="Dosya seç veya sürükle bırak (.xlsx, .xls, .csv)"><b>Dosya seç</b> veya sürükle bırak<br/>(.xlsx, .xls, .csv)</div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none;" />
+        <div class="filename" id="fileName" style="display:none;"></div>
+
+        <label for="sheetSelect">Sayfa</label>
+        <select id="sheetSelect" disabled><option>—</option></select>
+
+        <label for="headerRowInput">Başlık Satırı (1 = dosyanın ilk satırı)</label>
+        <input type="number" id="headerRowInput" min="1" step="1" value="1" />
+        <div class="hint">Karne kanaatte başlıktan önce boş/başlık dışı satır varsa burayı değiştir.</div>
+
+        <label for="mtIdSelect">MT / Sicil Sütunu (opsiyonel)</label>
+        <select id="mtIdSelect"><option value="-1">— (satır numarasıyla göster)</option></select>
+
+        <label for="colSelect">Ana Performans Notu Sütunu</label>
+        <select id="colSelect" disabled><option>—</option></select>
+
+        <label>Dashboard'da izlenecek diğer metrikler</label>
+        <div class="metric-picker" id="metricPicker"><span class="none">Önce bir dosya yükleyin.</span></div>
+
+        <button class="primary" id="calcBtn" type="button" disabled>Hesapla ve Kaydet</button>
+        <div class="hint" id="parseHint" role="status" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div>
+      <div class="panel">
+        <h2 class="panel-title">Durum Göstergesi <span class="tag" id="gaugeSegmentTag"></span></h2>
+        <div class="gauge-card">
+          <div id="gaugeWrap" style="flex:1 1 260px;min-width:220px;max-width:320px;"></div>
+          <div class="gauge-readout">
+            <div class="readout-row"><span class="k">Hedef ortalama</span><span class="v" id="roTarget">—</span></div>
+            <div class="readout-row"><span class="k">Gerçekleşen ortalama</span><span class="v" id="roActual">—</span></div>
+            <div class="readout-row"><span class="k">Puan sapması</span><span class="v" id="roDev">—</span></div>
+            <div class="readout-row"><span class="k">Hedef prim</span><span class="v" id="roTargetPrim">—</span></div>
+            <div class="readout-row"><span class="k">Gerçekleşen prim (skala)</span><span class="v" id="roActualPrim">—</span></div>
+            <div class="readout-row"><span class="k">Prim sapması</span><span class="v" id="roPrimDelta">—</span></div>
+            <div class="level-banner idle" id="levelBanner" role="status" aria-live="polite">Henüz bir karne kanaat işlenmedi.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel-title">Kanaat Sonrası Not Dağılımı <span class="tag" id="gradeDistCount"></span></h2>
+        <div id="gradeDistHolder"><div class="empty">Hesaplama yapıldığında notların harf notu ve aralık bazında adet/yüzde dağılımı burada gösterilecek.</div></div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel-title">MT Bazında Detay <span class="tag" id="mtDetailCount"></span></h2>
+        <div id="mtDetailHolder"><div class="empty">Hesaplama yapıldığında her MT'nin notu ve skaladan aldığı prim burada listelenecek.</div></div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel-title">Aksiyon Önerileri</h2>
+        <ul class="rec-list" id="recList"><li style="color:var(--text-faint);">Hesaplama yapıldığında öneriler burada görünecek.</li></ul>
+        <button class="ghost" id="aiBtn" type="button" disabled style="margin-top:14px;">Yapay Zeka Yorumu Al</button>
+        <div id="aiBox"></div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel-title">Diğer Metrikler</h2>
+        <div id="metricDashboard"><div class="empty">Hesaplama yapıldığında seçtiğin metrikler burada listelenecek.</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="hist-header">
+          <h2 class="panel-title" style="margin:0;">Geçmiş Trend</h2>
+          <button class="ghost small" id="clearHistBtn" type="button" style="width:auto;">Segment Geçmişini Temizle</button>
+        </div>
+        <div class="hist-sub" id="histSub"></div>
+        <div id="chartHolder" style="overflow-x:auto;"></div>
+        <div id="histTableHolder" style="margin-top:16px;"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const fmtTL = (n) => (n<0?"-":"") + "₺" + Math.abs(Math.round(n)).toLocaleString('tr-TR');
+  const fmtNum = (n,d=2) => Number(n).toLocaleString('tr-TR',{minimumFractionDigits:d,maximumFractionDigits:d});
+  const fmtPct = (n,d=1) => (n>=0?'+':'') + Number(n).toLocaleString('tr-TR',{minimumFractionDigits:d,maximumFractionDigits:d}) + '%';
+  const turkishPeriod = () => {
+    const months=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+    const d=new Date();
+    return months[d.getMonth()]+" "+d.getFullYear();
+  };
+
+  // Generic fallback scale used only for brand-new custom segments the user creates
+  const DEFAULT_SCALE = [
+    {note:1,   prim:0,    grade:'BS'},
+    {note:2,   prim:750,  grade:'BS'},
+    {note:2.5, prim:750,  grade:'B'},
+    {note:3,   prim:1250, grade:'B'},
+    {note:3.5, prim:1750, grade:'ÜB'},
+    {note:4,   prim:2250, grade:'ÜB'},
+    {note:4.5, prim:3000, grade:'OB'},
+  ];
+
+  // Real prim scales supplied by the user (Prim_skalaları.xlsx) — one breakpoint per 0.1 puan
+  const UPLOADED_SCALES = {
+    "Hizmet-50-a": [{n:1,p:0,g:"BS"},{n:1.1,p:0,g:"BS"},{n:1.2,p:0,g:"BS"},{n:1.3,p:0,g:"BS"},{n:1.4,p:0,g:"BS"},{n:1.5,p:0,g:"BS"},{n:1.6,p:0,g:"BS"},{n:1.7,p:0,g:"BS"},{n:1.8,p:0,g:"BS"},{n:1.9,p:0,g:"BS"},{n:2,p:0,g:"BS"},{n:2.1,p:0,g:"BS"},{n:2.2,p:0,g:"BS"},{n:2.3,p:0,g:"BS"},{n:2.4,p:0,g:"BS"},{n:2.5,p:800,g:"B"},{n:2.6,p:800,g:"B"},{n:2.7,p:800,g:"B"},{n:2.8,p:800,g:"B"},{n:2.9,p:800,g:"B"},{n:3,p:3000,g:"B"},{n:3.1,p:3100,g:"B"},{n:3.2,p:3200,g:"B"},{n:3.3,p:3300,g:"B"},{n:3.4,p:3400,g:"B"},{n:3.5,p:4200,g:"ÜB"},{n:3.6,p:4320,g:"ÜB"},{n:3.7,p:4440,g:"ÜB"},{n:3.8,p:4560,g:"ÜB"},{n:3.9,p:4680,g:"ÜB"},{n:4,p:4800,g:"ÜB"},{n:4.1,p:4920,g:"ÜB"},{n:4.2,p:5040,g:"ÜB"},{n:4.3,p:5160,g:"ÜB"},{n:4.4,p:5280,g:"ÜB"},{n:4.5,p:6300,g:"OB"},{n:4.6,p:6439.999999999999,g:"OB"},{n:4.7,p:6580,g:"OB"},{n:4.8,p:6720,g:"OB"},{n:4.9,p:6860.000000000001,g:"OB"},{n:5,p:7000,g:"OB"}],
+    "Hizmet-50-b": [{n:1,p:0,g:"BS"},{n:1.1,p:0,g:"BS"},{n:1.2,p:0,g:"BS"},{n:1.3,p:0,g:"BS"},{n:1.4,p:0,g:"BS"},{n:1.5,p:0,g:"BS"},{n:1.6,p:0,g:"BS"},{n:1.7,p:0,g:"BS"},{n:1.8,p:0,g:"BS"},{n:1.9,p:0,g:"BS"},{n:2,p:0,g:"BS"},{n:2.1,p:0,g:"BS"},{n:2.2,p:0,g:"BS"},{n:2.3,p:0,g:"BS"},{n:2.4,p:0,g:"BS"},{n:2.5,p:800,g:"B"},{n:2.6,p:800,g:"B"},{n:2.7,p:800,g:"B"},{n:2.8,p:800,g:"B"},{n:2.9,p:800,g:"B"},{n:3,p:3900,g:"B"},{n:3.1,p:4030,g:"B"},{n:3.2,p:4160,g:"B"},{n:3.3,p:4290,g:"B"},{n:3.4,p:4420,g:"B"},{n:3.5,p:5600,g:"ÜB"},{n:3.6,p:5760,g:"ÜB"},{n:3.7,p:5920,g:"ÜB"},{n:3.8,p:6080,g:"ÜB"},{n:3.9,p:6240,g:"ÜB"},{n:4,p:6400,g:"ÜB"},{n:4.1,p:6559.999999999999,g:"ÜB"},{n:4.2,p:6720,g:"ÜB"},{n:4.3,p:6880,g:"ÜB"},{n:4.4,p:7040.000000000001,g:"ÜB"},{n:4.5,p:8100,g:"OB"},{n:4.6,p:8280,g:"OB"},{n:4.7,p:8460,g:"OB"},{n:4.8,p:8640,g:"OB"},{n:4.9,p:8820,g:"OB"},{n:5,p:9000,g:"OB"}],
+    "Hizmet-51": [{n:1,p:0,g:"BS"},{n:1.1,p:0,g:"BS"},{n:1.2,p:0,g:"BS"},{n:1.3,p:0,g:"BS"},{n:1.4,p:0,g:"BS"},{n:1.5,p:0,g:"BS"},{n:1.6,p:0,g:"BS"},{n:1.7,p:0,g:"BS"},{n:1.8,p:0,g:"BS"},{n:1.9,p:0,g:"BS"},{n:2,p:0,g:"BS"},{n:2.1,p:0,g:"BS"},{n:2.2,p:0,g:"BS"},{n:2.3,p:0,g:"BS"},{n:2.4,p:0,g:"BS"},{n:2.5,p:800,g:"B"},{n:2.6,p:800,g:"B"},{n:2.7,p:800,g:"B"},{n:2.8,p:800,g:"B"},{n:2.9,p:800,g:"B"},{n:3,p:5100,g:"B"},{n:3.1,p:5270,g:"B"},{n:3.2,p:5440,g:"B"},{n:3.3,p:5610,g:"B"},{n:3.4,p:5780,g:"B"},{n:3.5,p:7000,g:"ÜB"},{n:3.6,p:7200,g:"ÜB"},{n:3.7,p:7400,g:"ÜB"},{n:3.8,p:7600,g:"ÜB"},{n:3.9,p:7800,g:"ÜB"},{n:4,p:8000,g:"ÜB"},{n:4.1,p:8200,g:"ÜB"},{n:4.2,p:8400,g:"ÜB"},{n:4.3,p:8600,g:"ÜB"},{n:4.4,p:8800,g:"ÜB"},{n:4.5,p:10800,g:"OB"},{n:4.6,p:11040,g:"OB"},{n:4.7,p:11280,g:"OB"},{n:4.8,p:11520,g:"OB"},{n:4.9,p:11760,g:"OB"},{n:5,p:12000,g:"OB"}],
+    "Hizmet-52": [{n:1,p:0,g:"BS"},{n:1.1,p:0,g:"BS"},{n:1.2,p:0,g:"BS"},{n:1.3,p:0,g:"BS"},{n:1.4,p:0,g:"BS"},{n:1.5,p:0,g:"BS"},{n:1.6,p:0,g:"BS"},{n:1.7,p:0,g:"BS"},{n:1.8,p:0,g:"BS"},{n:1.9,p:0,g:"BS"},{n:2,p:0,g:"BS"},{n:2.1,p:0,g:"BS"},{n:2.2,p:0,g:"BS"},{n:2.3,p:0,g:"BS"},{n:2.4,p:0,g:"BS"},{n:2.5,p:800,g:"B"},{n:2.6,p:800,g:"B"},{n:2.7,p:800,g:"B"},{n:2.8,p:800,g:"B"},{n:2.9,p:800,g:"B"},{n:3,p:3900,g:"B"},{n:3.1,p:4030,g:"B"},{n:3.2,p:4160,g:"B"},{n:3.3,p:4290,g:"B"},{n:3.4,p:4420,g:"B"},{n:3.5,p:5600,g:"ÜB"},{n:3.6,p:5760,g:"ÜB"},{n:3.7,p:5920,g:"ÜB"},{n:3.8,p:6080,g:"ÜB"},{n:3.9,p:6240,g:"ÜB"},{n:4,p:6400,g:"ÜB"},{n:4.1,p:6559.999999999999,g:"ÜB"},{n:4.2,p:6720,g:"ÜB"},{n:4.3,p:6880,g:"ÜB"},{n:4.4,p:7040.000000000001,g:"ÜB"},{n:4.5,p:8100,g:"OB"},{n:4.6,p:8280,g:"OB"},{n:4.7,p:8460,g:"OB"},{n:4.8,p:8640,g:"OB"},{n:4.9,p:8820,g:"OB"},{n:5,p:9000,g:"OB"}],
+  };
+
+  const DEFAULT_SEGMENT_NAMES = ["Hizmet-50-a","Hizmet-50-b","Hizmet-51","Hizmet-52"];
+  function newSegmentConfig(name){
+    const uploaded = name ? UPLOADED_SCALES[name] : null;
+    const scale = uploaded ? uploaded.map(r=>({note:r.n, prim:r.p, grade:r.g})) : DEFAULT_SCALE.map(r=>({note:r.note, prim:r.prim, grade:r.grade||''}));
+    return { scale, targetAvg:3.5, targetPrim:90000, tolerance:2 };
+  }
+
+  let settings = { activeSegment: DEFAULT_SEGMENT_NAMES[0], segments:{}, dashboardMetrics: [] };
+  DEFAULT_SEGMENT_NAMES.forEach(name => settings.segments[name] = newSegmentConfig(name));
+
+  let history = []; // {label,date,segment,actual,target,tolerance,targetPrim,primTotal,primDelta,primDeltaPct,level,rowCount,unmatched,metrics:{name:avg}}
+  let parsedWorkbook = null;
+  let currentCalc = null;
+
+  // ---------- resilient storage ----------
+  async function storageSetWithRetry(key, valueObj, shared, maxRetries){
+    maxRetries = maxRetries===undefined ? 2 : maxRetries;
+    const value = JSON.stringify(valueObj);
+    let lastErr = null;
+    for(let attempt=0; attempt<=maxRetries; attempt++){
+      try{
+        const res = await window.storage.set(key, value, shared);
+        if(res) return { ok:true };
+        lastErr = new Error('Sunucu boş yanıt döndürdü');
+      }catch(e){
+        lastErr = e;
+      }
+      if(attempt<maxRetries) await new Promise(r=>setTimeout(r, 500*(attempt+1)));
+    }
+    return { ok:false, error:lastErr };
+  }
+
+  let lastFailedSave = null;
+  function showSaveError(msg, retryFn){
+    lastFailedSave = retryFn;
+    const el = $('saveErrorBanner');
+    el.querySelector('.msg').textContent = msg;
+    el.style.display = 'flex';
+  }
+  function hideSaveError(){
+    lastFailedSave = null;
+    $('saveErrorBanner').style.display = 'none';
+  }
+  $('retrySaveBtn').addEventListener('click', ()=>{ if(lastFailedSave) lastFailedSave(); });
+
+  async function persistSettings(){
+    const res = await storageSetWithRetry('settings', settings, false);
+    if(!res.ok){
+      showSaveError('Ayarlar kaydedilemedi (' + (res.error ? res.error.message : 'bilinmeyen hata') + '). Değişiklikler bu oturumda geçerli ama yeniden açılışta kaybolabilir.', persistSettings);
+    } else hideSaveError();
+    return res.ok;
+  }
+  async function persistHistory(){
+    const res = await storageSetWithRetry('history', history, false);
+    if(!res.ok){
+      showSaveError('Geçmiş kaydedilemedi (' + (res.error ? res.error.message : 'bilinmeyen hata') + '). Bu dönemin sonucu ekranda duruyor ama kalıcı olmayabilir.', persistHistory);
+    } else hideSaveError();
+    return res.ok;
+  }
+
+  function flashButton(btn, msg){
+    const orig = btn.textContent;
+    btn.textContent = msg;
+    setTimeout(()=>{ btn.textContent = orig; }, 1400);
+  }
+
+  // ---------- load ----------
+  async function loadState(){
+    let loadedFromStorage = false;
+    try{
+      const r = await window.storage.get('settings', false);
+      if(r && r.value){
+        loadedFromStorage = true;
+        const loaded = JSON.parse(r.value);
+        if(loaded.segments){
+          settings = loaded;
+        } else if(loaded.scale || loaded.targetAvg){
+          // migrate old flat (single-segment) format
+          const migrated = newSegmentConfig(DEFAULT_SEGMENT_NAMES[0]);
+          if(loaded.targetAvg) migrated.targetAvg = loaded.targetAvg;
+          if(loaded.targetPrim!==undefined) migrated.targetPrim = loaded.targetPrim;
+          if(loaded.tolerance) migrated.tolerance = loaded.tolerance;
+          settings.segments[DEFAULT_SEGMENT_NAMES[0]] = migrated;
+          settings.dashboardMetrics = loaded.dashboardMetrics || [];
+        }
+        if(!settings.dashboardMetrics) settings.dashboardMetrics = [];
+        if(!settings.segments || Object.keys(settings.segments).length===0){
+          settings.segments = {}; DEFAULT_SEGMENT_NAMES.forEach(n=> settings.segments[n]=newSegmentConfig(n));
+        }
+        // convert any leftover legacy min/max scale rows (from an earlier version) to note/prim breakpoints
+        Object.keys(settings.segments).forEach(name=>{
+          const seg = settings.segments[name];
+          if(Array.isArray(seg.scale) && seg.scale.length && seg.scale[0].note===undefined){
+            seg.scale = seg.scale.map(r=>({note: r.min!==undefined?r.min:0, prim:r.prim}));
+          }
+        });
+        // the 4 known segments now have real uploaded scale data — keep it authoritative
+        DEFAULT_SEGMENT_NAMES.forEach(name=>{
+          if(UPLOADED_SCALES[name]){
+            if(!settings.segments[name]) settings.segments[name] = newSegmentConfig(name);
+            settings.segments[name].scale = UPLOADED_SCALES[name].map(r=>({note:r.n, prim:r.p, grade:r.g}));
+          }
+        });
+        if(!settings.activeSegment || !settings.segments[settings.activeSegment]){
+          settings.activeSegment = Object.keys(settings.segments)[0];
+        }
+      }
+    }catch(e){ /* no settings yet, keep defaults */ }
+    if(!loadedFromStorage){
+      // first run, nothing in storage yet — persist the real uploaded scales right away
+      persistSettings();
+    }
+
+    try{
+      const r = await window.storage.get('history', false);
+      if(r && r.value) history = JSON.parse(r.value);
+    }catch(e){ history = []; }
+
+    populateSegmentSelect();
+    loadSegmentToForm(settings.activeSegment);
+    $('periodLabel').value = turkishPeriod();
+    renderHistory();
+  }
+
+  // ---------- segments ----------
+  function populateSegmentSelect(){
+    const sel = $('segmentSelect');
+    sel.innerHTML = '';
+    Object.keys(settings.segments).forEach(name=>{
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      sel.appendChild(opt);
+    });
+    sel.value = settings.activeSegment;
+  }
+
+  function loadSegmentToForm(name){
+    const seg = settings.segments[name];
+    if(!seg) return;
+    $('targetAvg').value = seg.targetAvg;
+    $('targetPrim').value = seg.targetPrim;
+    $('tolerance').value = seg.tolerance;
+    renderScaleRows(seg.scale);
+    $('scaleSegmentTag').textContent = name;
+    $('gaugeSegmentTag').textContent = name;
+  }
+
+  function applyFormToActiveSegment(){
+    const name = settings.activeSegment;
+    if(!settings.segments[name]) settings.segments[name] = newSegmentConfig(name);
+    settings.segments[name].targetAvg = parseFloat($('targetAvg').value)||3.5;
+    settings.segments[name].targetPrim = parseFloat($('targetPrim').value)||0;
+    settings.segments[name].tolerance = Math.max(0.01, parseFloat($('tolerance').value)||2);
+    settings.segments[name].scale = collectScaleFromDOM();
+  }
+
+  $('segmentSelect').addEventListener('change', ()=>{
+    applyFormToActiveSegment(); // keep in-memory edits of the segment we're leaving
+    settings.activeSegment = $('segmentSelect').value;
+    loadSegmentToForm(settings.activeSegment);
+    renderHistory();
+  });
+
+  $('addSegmentBtn').addEventListener('click', ()=>{
+    const name = (prompt('Yeni segment adı (örn. Hizmet-53):') || '').trim();
+    if(!name) return;
+    if(settings.segments[name]){ alert('Bu isimde bir segment zaten var.'); return; }
+    applyFormToActiveSegment();
+    settings.segments[name] = newSegmentConfig(name);
+    settings.activeSegment = name;
+    populateSegmentSelect();
+    loadSegmentToForm(name);
+    persistSettings();
+  });
+
+  $('deleteSegmentBtn').addEventListener('click', ()=>{
+    const names = Object.keys(settings.segments);
+    if(names.length<=1){ alert('En az bir segment kalmalı.'); return; }
+    if(!confirm('"'+settings.activeSegment+'" segmentini ve skalasını silmek istediğine emin misin?')) return;
+    delete settings.segments[settings.activeSegment];
+    settings.activeSegment = Object.keys(settings.segments)[0];
+    populateSegmentSelect();
+    loadSegmentToForm(settings.activeSegment);
+    renderHistory();
+    persistSettings();
+  });
+
+  $('saveSettingsBtn').addEventListener('click', async ()=>{
+    applyFormToActiveSegment();
+    const ok = await persistSettings();
+    flashButton($('saveSettingsBtn'), ok ? 'Kaydedildi ✓' : 'Kaydedilemedi');
+  });
+
+  // ---------- scale table ----------
+  function renderScaleRows(rows){
+    const holder = $('scaleRows');
+    holder.innerHTML = '';
+    rows.forEach((row, idx)=>{
+      const div = document.createElement('div');
+      div.className = 'scale-row';
+      div.innerHTML =
+        '<input type="number" step="0.1" value="'+row.note+'" data-idx="'+idx+'" data-field="note"/>' +
+        '<input type="number" step="10" value="'+row.prim+'" data-idx="'+idx+'" data-field="prim"/>' +
+        '<span class="scale-grade" data-grade="'+(row.grade||'')+'">'+(row.grade||'—')+'</span>' +
+        '<button class="ghost small rm" type="button" data-idx="'+idx+'" title="Satırı sil" aria-label="Satırı sil">✕</button>';
+      holder.appendChild(div);
+    });
+    holder.querySelectorAll('.rm').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const idx = parseInt(btn.dataset.idx,10);
+        const rows2 = collectScaleFromDOM();
+        rows2.splice(idx,1);
+        renderScaleRows(rows2);
+      });
+    });
+  }
+
+  $('addScaleRowBtn').addEventListener('click', ()=>{
+    const rows = collectScaleFromDOM();
+    rows.push({note:0, prim:0, grade:''});
+    renderScaleRows(rows);
+  });
+
+  function collectScaleFromDOM(){
+    const rows = [];
+    document.querySelectorAll('#scaleRows .scale-row').forEach(div=>{
+      const note = parseFloat(div.querySelector('[data-field=note]').value);
+      const prim = parseFloat(div.querySelector('[data-field=prim]').value);
+      const gradeEl = div.querySelector('.scale-grade');
+      const grade = gradeEl ? (gradeEl.dataset.grade || '') : '';
+      rows.push({note: isNaN(note)?0:note, prim: isNaN(prim)?0:prim, grade});
+    });
+    return rows;
+  }
+
+  $('saveScaleBtn').addEventListener('click', async ()=>{
+    applyFormToActiveSegment();
+    const ok = await persistSettings();
+    flashButton($('saveScaleBtn'), ok ? 'Skala kaydedildi ✓' : 'Kaydedilemedi');
+  });
+
+  function lookupScalePrim(score, scale){
+    if(!scale || scale.length===0) return null;
+    const sorted = scale.slice().sort((a,b)=>a.note-b.note);
+    let match = sorted[0];
+    for(const r of sorted){ if(score >= r.note) match = r; else break; }
+    return match.prim;
+  }
+
+  function lookupHarfNotu(score, scale){
+    if(!scale || scale.length===0) return '';
+    const sorted = scale.slice().sort((a,b)=>a.note-b.note);
+    let match = sorted[0];
+    for(const r of sorted){ if(score >= r.note) match = r; else break; }
+    return match.grade || '';
+  }
+
+  // ---------- file parsing ----------
+  const dropZone = $('dropZone');
+  const fileInput = $('fileInput');
+  dropZone.addEventListener('click', ()=> fileInput.click());
+  dropZone.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' || e.key===' '){ e.preventDefault(); fileInput.click(); }
+  });
+  dropZone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropZone.classList.add('drag'); });
+  dropZone.addEventListener('dragleave', ()=> dropZone.classList.remove('drag'));
+  dropZone.addEventListener('drop', (e)=>{
+    e.preventDefault(); dropZone.classList.remove('drag');
+    if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', (e)=>{
+    if(e.target.files.length) handleFile(e.target.files[0]);
+  });
+
+  function handleFile(file){
+    $('fileName').style.display='block';
+    $('fileName').textContent = file.name;
+    $('parseHint').textContent = 'Dosya okunuyor...';
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try{
+        const data = new Uint8Array(evt.target.result);
+        parsedWorkbook = XLSX.read(data, {type:'array'});
+        populateSheetSelect();
+        $('parseHint').textContent = 'Sayfa, ana sütun ve dashboard metriklerini seçip hesaplayın.';
+      }catch(err){
+        $('parseHint').textContent = 'Dosya okunamadı: ' + err.message;
+      }
+    };
+    reader.onerror = () => { $('parseHint').textContent = 'Dosya okunamadı.'; };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function populateSheetSelect(){
+    const sel = $('sheetSelect');
+    sel.innerHTML = '';
+    parsedWorkbook.SheetNames.forEach(name=>{
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      sel.appendChild(opt);
+    });
+    sel.disabled = false;
+    sel.onchange = ()=>{ populateColSelect(); populateMetricPicker(); populateMtIdSelect(); };
+    populateColSelect();
+    populateMetricPicker();
+    populateMtIdSelect();
+  }
+
+  function currentRows(){
+    const sheetName = $('sheetSelect').value;
+    const sheet = parsedWorkbook.Sheets[sheetName];
+    return XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+  }
+
+  function headerRowIdx0(){
+    return Math.max(0, (parseInt($('headerRowInput').value,10)||1) - 1);
+  }
+
+  function getHeaderRow(rows){
+    return rows[headerRowIdx0()] || [];
+  }
+
+  function headerLabel(h, idx){
+    return (h===''||h===undefined||h===null) ? ('Sütun '+String.fromCharCode(65+idx)) : String(h);
+  }
+
+  function populateColSelect(){
+    const rows = currentRows();
+    const header = getHeaderRow(rows);
+    const sel = $('colSelect');
+    sel.innerHTML = '';
+    header.forEach((h, idx)=>{
+      const opt = document.createElement('option');
+      opt.value = idx; opt.textContent = headerLabel(h, idx) + ' ('+String.fromCharCode(65+idx)+')';
+      sel.appendChild(opt);
+    });
+    sel.disabled = header.length===0;
+    $('calcBtn').disabled = header.length===0;
+  }
+
+  function populateMtIdSelect(){
+    const rows = currentRows();
+    const header = getHeaderRow(rows);
+    const sel = $('mtIdSelect');
+    sel.innerHTML = '<option value="-1">— (satır numarasıyla göster)</option>';
+    header.forEach((h, idx)=>{
+      const opt = document.createElement('option');
+      opt.value = idx; opt.textContent = headerLabel(h, idx) + ' ('+String.fromCharCode(65+idx)+')';
+      sel.appendChild(opt);
+    });
+  }
+  $('headerRowInput').addEventListener('change', ()=>{
+    if(parsedWorkbook){ populateColSelect(); populateMetricPicker(); populateMtIdSelect(); }
+  });
+
+  function populateMetricPicker(){
+    const rows = currentRows();
+    const header = getHeaderRow(rows);
+    const holder = $('metricPicker');
+    holder.innerHTML = '';
+    if(header.length===0){ holder.innerHTML = '<span class="none">Sütun bulunamadı.</span>'; return; }
+    header.forEach((h, idx)=>{
+      const label = headerLabel(h, idx);
+      const wrap = document.createElement('label');
+      const checked = settings.dashboardMetrics.indexOf(label) !== -1 ? 'checked' : '';
+      wrap.innerHTML = '<input type="checkbox" data-idx="'+idx+'" data-name="'+label.replace(/"/g,'&quot;')+'" '+checked+'/> '+label;
+      holder.appendChild(wrap);
+    });
+  }
+
+  $('calcBtn').addEventListener('click', runCalculation);
+
+  function colAverage(rows, colIdx, startIdx){
+    let sum=0, count=0;
+    for(let i=startIdx;i<rows.length;i++){
+      const raw = rows[i][colIdx];
+      const num = parseFloat(String(raw).replace(',', '.'));
+      if(!isNaN(num)){ sum += num; count++; }
+    }
+    return count>0 ? {avg: sum/count, count} : null;
+  }
+
+  function runCalculation(){
+    const rows = currentRows();
+    const colIdx = parseInt($('colSelect').value, 10);
+    const startIdx = headerRowIdx0() + 1;
+    const header = getHeaderRow(rows);
+    const mtIdIdx = parseInt($('mtIdSelect').value, 10);
+
+    const mainRes = colAverage(rows, colIdx, startIdx);
+    if(!mainRes){
+      $('parseHint').textContent = 'Seçilen ana sütunda sayısal veri bulunamadı. Başlık satırı doğru mu kontrol et (şu an satır '+(startIdx)+'den itibaren okunuyor).';
+      return;
+    }
+
+    applyFormToActiveSegment();
+    const seg = settings.segments[settings.activeSegment];
+
+    // build per-row detail, then group by MT identifier if one was chosen
+    const rowDetail = [];
+    for(let i=startIdx;i<rows.length;i++){
+      const raw = rows[i][colIdx];
+      const num = parseFloat(String(raw).replace(',', '.'));
+      if(isNaN(num)) continue;
+      const mtLabel = mtIdIdx>=0 ? String(rows[i][mtIdIdx]!==undefined && rows[i][mtIdIdx]!=='' ? rows[i][mtIdIdx] : ('Satır '+(i+1))) : ('Satır '+(i+1));
+      rowDetail.push({ mt: mtLabel, note: num });
+    }
+
+    // average note per MT (if the same MT appears on multiple rows), then look up prim per MT once
+    const byMt = {};
+    const mtOrder = [];
+    rowDetail.forEach(r=>{
+      if(!byMt[r.mt]){ byMt[r.mt] = { sum:0, count:0 }; mtOrder.push(r.mt); }
+      byMt[r.mt].sum += r.note;
+      byMt[r.mt].count += 1;
+    });
+    let primTotal = 0, unmatched = 0;
+    const mtDetail = mtOrder.map(mt=>{
+      const avgNote = byMt[mt].sum / byMt[mt].count;
+      const p = lookupScalePrim(avgNote, seg.scale);
+      const grade = lookupHarfNotu(avgNote, seg.scale);
+      if(p===null) unmatched++; else primTotal += p;
+      return { mt, note: avgNote, prim: p===null?0:p, grade };
+    });
+
+    const actual = mainRes.avg;
+    const deviation = actual - seg.targetAvg;
+    const primDelta = primTotal - seg.targetPrim;
+    const primDeltaPct = seg.targetPrim !== 0 ? (primDelta/seg.targetPrim)*100 : 0;
+    const level = alarmLevel(primDeltaPct, seg.tolerance);
+
+    const checked = Array.from(document.querySelectorAll('#metricPicker input[type=checkbox]:checked'));
+    settings.dashboardMetrics = checked.map(c=>c.dataset.name);
+    const metrics = {};
+    checked.forEach(c=>{
+      const idx = parseInt(c.dataset.idx,10);
+      const res = colAverage(rows, idx, startIdx);
+      metrics[c.dataset.name] = res ? res.avg : null;
+    });
+
+    // previous entry for the SAME segment, used only for the on-screen delta arrow (not persisted twice)
+    let prevMetrics = null;
+    for(let i=history.length-1;i>=0;i--){
+      if(history[i].segment === settings.activeSegment){ prevMetrics = history[i].metrics; break; }
+    }
+
+    currentCalc = {
+      label: $('periodLabel').value || turkishPeriod(),
+      date: new Date().toISOString(),
+      segment: settings.activeSegment,
+      actual, target: seg.targetAvg, tolerance: seg.tolerance,
+      deviation, primDelta, primDeltaPct,
+      targetPrim: seg.targetPrim, primTotal,
+      rowCount: mainRes.count, mtCount: mtOrder.length, unmatched, level, metrics
+    };
+
+    history.push(currentCalc);
+    $('parseHint').textContent = mainRes.count + ' satırdan, ' + mtOrder.length + ' MT için ortalama hesaplandı.' + (unmatched>0 ? (' '+unmatched+' MT skala aralığına denk gelmedi (0 sayıldı).') : '');
+
+    renderCalc(currentCalc);
+    renderRecommendations(currentCalc);
+    try{ renderMetricDashboard(currentCalc, prevMetrics); }catch(e){ console.error('renderMetricDashboard', e); }
+    try{ renderMtDetail(mtDetail); }catch(e){ console.error('renderMtDetail', e); } // shown on screen only, never persisted (keeps storage light)
+    try{ renderGradeDistribution(mtDetail); }catch(e){ console.error('renderGradeDistribution', e); }
+    try{ renderHistory(); }catch(e){ console.error('renderHistory', e); }
+    $('aiBtn').disabled = false;
+    $('aiBox').innerHTML = '';
+    $('pdfBtn').disabled = false;
+
+    persistSettings();
+    persistHistory();
+  }
+
+  function renderMtDetail(mtDetail){
+    const holder = $('mtDetailHolder');
+    $('mtDetailCount').textContent = mtDetail.length + ' MT';
+    if(mtDetail.length===0){
+      holder.innerHTML = '<div class="empty">Gösterilecek MT bulunamadı.</div>';
+      return;
+    }
+    const sorted = mtDetail.slice().sort((a,b)=> b.note - a.note);
+    const capped = sorted.slice(0, 1000);
+    let rows = '';
+    capped.forEach(r=>{
+      rows += '<tr><td>'+String(r.mt).replace(/</g,'&lt;')+'</td><td>'+fmtNum(r.note)+'</td><td>'+fmtTL(r.prim)+'</td></tr>';
+    });
+    let html = '<div class="mt-detail-scroll"><table><thead><tr><th>MT</th><th>Not</th><th>Prim</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    if(sorted.length>1000){
+      html += '<div class="mt-detail-note">İlk 1000 MT gösteriliyor (toplam '+sorted.length+'). Üstteki toplamlar tüm MT\u2019leri kapsar.</div>';
+    }
+    holder.innerHTML = html;
+  }
+
+  // ---------- distribution tables — both driven by the same 5 ranges from the user's template ----------
+  const GRADE_COLORS = { 'BS':'#e0554f', 'B':'#e0a030', 'ÜB':'#4fb286', 'OB':'#5b8fd9' };
+
+  const DIST_RANGES = [
+    { grade:'BS', label:'1,0 – 2,49',  min:1.0, max:2.49 },
+    { grade:'B',  label:'2,5 – 2,99',  min:2.5, max:2.99 },
+    { grade:'B',  label:'3,0 – 3,49',  min:3.0, max:3.49 },
+    { grade:'ÜB', label:'3,5 – 4,49',  min:3.5, max:4.49 },
+    { grade:'OB', label:'4,5 – 5,0',   min:4.5, max:5.0 },
+  ];
+
+  function computeRangeDistribution(mtDetail){
+    const total = mtDetail.length;
+    return DIST_RANGES.map(r=>{
+      const count = mtDetail.filter(m=> m.note>=r.min && m.note<=r.max).length;
+      return { grade:r.grade, label:r.label, count, pct: total>0 ? (count/total*100) : 0 };
+    });
+  }
+
+  function renderGradeDistribution(mtDetail){
+    const holder = $('gradeDistHolder');
+    const total = mtDetail.length;
+    $('gradeDistCount').textContent = total + ' MT';
+    if(total===0){
+      holder.innerHTML = '<div class="empty">Gösterilecek not dağılımı bulunamadı.</div>';
+      return;
+    }
+    const dist = computeRangeDistribution(mtDetail);
+
+    let rows1 = '';
+    dist.forEach(d=>{
+      rows1 += '<tr><td><span class="badge" style="background:'+(GRADE_COLORS[d.grade]||'#8b96a5')+'"></span> '+d.grade+' ('+d.label+')</td><td>'+d.count+'</td><td>'+fmtNum(d.pct,1)+'%</td></tr>';
+    });
+    const table1 = '<table><thead><tr><th>Harf Notu</th><th>Adet</th><th>Yüzde</th></tr></thead><tbody>'+rows1+'</tbody></table>';
+
+    let rows2 = '';
+    dist.forEach(d=>{
+      rows2 += '<tr><td>'+d.label+'</td><td>'+d.count+'</td><td>'+fmtNum(d.pct,1)+'%</td></tr>';
+    });
+    const table2 = '<table><thead><tr><th>Aralık</th><th>Adet</th><th>Yüzde</th></tr></thead><tbody>'+rows2+'</tbody></table>';
+
+    holder.innerHTML =
+      '<div class="dist-subhead">Harf Notu Dağılımı</div>' + table1 +
+      '<div class="dist-subhead">Aralık Dağılımı</div>' + table2;
+  }
+
+  function alarmLevel(deltaPct, tolerancePct){
+    const a = Math.abs(deltaPct);
+    if(a <= tolerancePct) return 'safe';
+    if(a <= tolerancePct*2) return 'warn';
+    return 'crit';
+  }
+
+  // ---------- render: readout + banner ----------
+  function renderCalc(c){
+    $('statusDot').className = 'dot ' + c.level;
+    $('statusText').textContent = {safe:'Dengede', warn:'İzlemede', crit:'Alarm'}[c.level] + ' · ' + c.segment;
+
+    $('roTarget').textContent = fmtNum(c.target);
+    $('roActual').textContent = fmtNum(c.actual);
+    $('roDev').textContent = (c.deviation>=0?'+':'') + fmtNum(c.deviation);
+    $('roTargetPrim').textContent = fmtTL(c.targetPrim);
+    $('roActualPrim').textContent = fmtTL(c.primTotal);
+    $('roPrimDelta').textContent = (c.primDelta>=0?'+':'') + fmtTL(c.primDelta) + '  (' + fmtPct(c.primDeltaPct) + ')';
+    // budget-direction coloring: at/under budget = green (favorable), over budget = red — independent of alarm severity
+    $('roPrimDelta').className = 'v ' + (c.primDelta<=0 ? 'safe' : 'crit');
+
+    const banner = $('levelBanner');
+    banner.className = 'level-banner ' + c.level;
+    const msgs = {
+      safe: 'Gerçekleşen prim, tolerans bandının içinde. Skala ve hedeflerde aksiyon gerekmiyor.',
+      warn: 'Gerçekleşen prim tolerans bandını aştı. Skala kırılım noktalarını ve hedefleri gözden geçirmeyi değerlendirin.',
+      crit: 'Gerçekleşen prim alarm bandında. Skala/hedef revizyonu ve kök neden analizi önerilir.'
+    };
+    banner.textContent = msgs[c.level];
+
+    $('gaugeWrap').innerHTML = drawBudgetBar(c);
+  }
+
+  function renderRecommendations(c){
+    const list = $('recList');
+    list.innerHTML = '';
+    const items = [];
+    if(c.level==='safe'){
+      items.push('Mevcut skala ve hedefler dengeli görünüyor, bir değişiklik gerekmiyor.');
+      items.push('Bir sonraki dönemde de aynı bantta kalırsa, bu ayarları referans nokta olarak kullanabilirsiniz.');
+    } else if(c.primDelta>0){
+      items.push('Gerçekleşen prim hedefin '+fmtPct(c.primDeltaPct)+' üzerinde ('+fmtTL(Math.abs(c.primDelta))+' fazla).');
+      items.push('Skala tablosundaki üst bantlara düşen satır sayısını kontrol edin — kırılım noktası çok kolay aşılıyor olabilir.');
+      items.push('Yüksek puan alan MT/TL dağılımını inceleyin: genel bir kayma mı, belirli bir grupta yığılma mı?');
+      if(c.level==='crit') items.push('Sapma kritik bantta: bir sonraki döneme geçmeden bu segmentin skala kırılım noktalarını revize edin.');
+    } else {
+      items.push('Gerçekleşen prim hedefin '+fmtPct(Math.abs(c.primDeltaPct))+' altında ('+fmtTL(Math.abs(c.primDelta))+' eksik).');
+      items.push('Skalanın alt bantlarının çok sert olup olmadığını ve hedefin gerçekçiliğini değerlendirin.');
+      items.push('Düşüşün belirli bir operasyon grubundan mı yoksa genel mi olduğunu kontrol edin.');
+      if(c.level==='crit') items.push('Sapma kritik bantta: hedefin ve skala kırılım noktalarının ulaşılabilirliğini acilen gözden geçirin.');
+    }
+    if(c.unmatched>0){
+      items.push(c.unmatched+' satırın puanı tanımlı skala aralıklarının dışında kaldı — skala tablosunu kontrol edin.');
+    }
+    items.forEach(t=>{
+      const li = document.createElement('li');
+      li.textContent = t;
+      list.appendChild(li);
+    });
+  }
+
+  function renderMetricDashboard(c, prevMetrics){
+    const holder = $('metricDashboard');
+    const names = Object.keys(c.metrics);
+    if(names.length===0){
+      holder.innerHTML = '<div class="empty">Sol panelden dashboarda eklenecek metrikleri seçin.</div>';
+      return;
+    }
+    let html = '<div class="metric-grid">';
+    names.forEach(name=>{
+      const val = c.metrics[name];
+      const prevVal = prevMetrics ? prevMetrics[name] : null;
+      let deltaHtml = '';
+      if(val!==null && prevVal!==null && prevVal!==undefined){
+        const d = val - prevVal;
+        const cls = d>0 ? 'up' : (d<0 ? 'down' : '');
+        const arrow = d>0 ? '▲' : (d<0 ? '▼' : '·');
+        deltaHtml = '<div class="mdelta '+cls+'">'+arrow+' '+(d>=0?'+':'')+fmtNum(d)+' önceki döneme göre</div>';
+      }
+      html += '<div class="metric-card"><div class="mname">'+name+'</div><div class="mval">'+(val!==null ? fmtNum(val) : '—')+'</div>'+deltaHtml+'</div>';
+    });
+    html += '</div>';
+    holder.innerHTML = html;
+  }
+
+  // ---------- budget bar (replaces the old needle gauge — this metric routinely swings
+  // far past the tolerance band, and an angular dial crushes/clips at those extremes;
+  // a linear bar stays legible at any magnitude) ----------
+  function drawBudgetBar(c){
+    const tol = Math.max(c.tolerance, 0.1);
+    const val = c.primDeltaPct;
+    const rangeMax = Math.max(tol*4, Math.abs(val)*1.15, tol*2);
+    const overflow = Math.abs(val) > rangeMax;
+    const width=280, height=140;
+    const padL=16, padR=16, trackY=68, trackH=18, trackW=width-padL-padR;
+
+    const xFor = v => padL + ((Math.max(-rangeMax,Math.min(rangeMax,v))+rangeMax)/(2*rangeMax))*trackW;
+    // Direction matters more than distance here: any deviation in the budget's favor (<=0)
+    // stays green regardless of size; only overspend escalates amber -> red past tolerance.
+    const zones = [
+      { from:-rangeMax, to:0,       color:'var(--safe)' },
+      { from:0,          to:tol,    color:'var(--safe)' },
+      { from:tol,        to:tol*2,  color:'var(--warn)' },
+      { from:tol*2,       to:rangeMax, color:'var(--crit)' },
+    ];
+    let bg = '';
+    zones.forEach(z=>{
+      const x1=xFor(z.from), x2=xFor(z.to);
+      bg += '<rect x="'+x1+'" y="'+trackY+'" width="'+Math.max(0,x2-x1)+'" height="'+trackH+'" fill="'+z.color+'" opacity="0.32"/>';
+    });
+
+    const zeroX = xFor(0), valX = xFor(val);
+    const markerColor = val<=tol ? 'var(--safe)' : (val<=tol*2 ? 'var(--warn)' : 'var(--crit)');
+    const fillX1 = Math.min(zeroX, valX), fillW = Math.max(2, Math.abs(valX-zeroX));
+    const overBudget = c.primDelta > 0;
+    const badgeColor = overBudget ? 'var(--crit)' : 'var(--safe)';
+    const badgeText = overBudget ? '⚠ BÜTÇE AŞIMI' : 'BÜTÇE LEHİNE';
+
+    const gaugeLabel = 'Prim sapması ' + fmtPct(val) + ', ' + (overBudget ? 'bütçe aşımı' : 'bütçe lehine');
+    return '<svg width="100%" height="'+height+'" viewBox="0 0 '+width+' '+height+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="'+gaugeLabel+'">' +
+      '<text x="'+(padL+trackW/2)+'" y="24" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="22" font-weight="600" fill="var(--text)">'+fmtPct(val)+'</text>' +
+      '<text x="'+(padL+trackW/2)+'" y="40" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" fill="var(--text-faint)">'+(overflow?'prim sapması (ölçek dışı)':'prim sapması')+'</text>' +
+      '<text x="'+(padL+trackW/2)+'" y="55" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" font-weight="600" letter-spacing="0.04em" fill="'+badgeColor+'">'+badgeText+'</text>' +
+      '<rect x="'+padL+'" y="'+trackY+'" width="'+trackW+'" height="'+trackH+'" rx="9" fill="#212a35"/>' +
+      bg +
+      '<rect x="'+fillX1+'" y="'+trackY+'" width="'+fillW+'" height="'+trackH+'" rx="9" fill="'+markerColor+'" opacity="0.9"/>' +
+      '<circle cx="'+valX+'" cy="'+(trackY+trackH/2)+'" r="7" fill="'+markerColor+'" stroke="#1a212a" stroke-width="2"/>' +
+      '<line x1="'+zeroX+'" y1="'+(trackY-6)+'" x2="'+zeroX+'" y2="'+(trackY+trackH+16)+'" stroke="#8b96a5" stroke-width="1.5" stroke-dasharray="3 3"/>' +
+      '<text x="'+zeroX+'" y="'+(trackY+trackH+36)+'" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--text-faint)">hedef</text>' +
+      '<text x="'+padL+'" y="'+(trackY+trackH+22)+'" text-anchor="start" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--text-faint)">-'+fmtNum(rangeMax,0)+'%</text>' +
+      '<text x="'+(padL+trackW)+'" y="'+(trackY+trackH+22)+'" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--text-faint)">+'+fmtNum(rangeMax,0)+'%</text>' +
+      '</svg>';
+  }
+
+  function drawIdleBar(){
+    const width=280, height=140, padL=16, padR=16, trackY=68, trackH=18, trackW=width-padL-padR;
+    return '<svg width="100%" height="'+height+'" viewBox="0 0 '+width+' '+height+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Henüz hesaplanmış veri yok">' +
+      '<text x="'+(padL+trackW/2)+'" y="24" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="16" fill="#57626f">—</text>' +
+      '<rect x="'+padL+'" y="'+trackY+'" width="'+trackW+'" height="'+trackH+'" rx="9" fill="#212a35"/>' +
+      '<circle cx="'+(padL+trackW/2)+'" cy="'+(trackY+trackH/2)+'" r="6" fill="#57626f"/>' +
+      '</svg>';
+  }
+  $('gaugeWrap').innerHTML = drawIdleBar();
+
+  // ---------- AI recommendation ----------
+  $('aiBtn').addEventListener('click', async ()=>{
+    if(!currentCalc) return;
+    const btn = $('aiBtn');
+    btn.disabled = true;
+    const origText = btn.textContent;
+    btn.textContent = 'Yorum hazırlanıyor...';
+
+    const sameSegmentHistory = history.filter(h=>h.segment===currentCalc.segment).slice(-6);
+    const recentHistory = sameSegmentHistory.map(h =>
+      h.label+': ortalama '+fmtNum(h.actual)+' (hedef '+fmtNum(h.target)+'), gerçekleşen prim '+fmtTL(h.primTotal)+' (hedef '+fmtTL(h.targetPrim)+', sapma '+fmtPct(h.primDeltaPct)+', seviye '+h.level+')'
+    ).join('\n');
+
+    const metricLines = Object.entries(currentCalc.metrics).map(([k,v])=> k+': '+(v!==null?fmtNum(v):'—')).join(', ');
+
+    const prompt = 'Sen bir tahsilat (collections) operasyonunda performans hesaplama ve prim yönetimi uzmanısın. Aşağıdaki verilere göre, yöneticiye 3-5 cümlelik, somut ve aksiyona dönük bir Türkçe değerlendirme yaz. Genel geçer laf kalabalığı yapma, sayılara ve olası kök nedenlere odaklan. Bu segmentin skala kırılım noktalarında veya hedeflerinde revizyon gerekip gerekmediğini net söyle.\n\n' +
+      'Segment: '+currentCalc.segment+'\n' +
+      'Dönem: '+currentCalc.label+'\n' +
+      'Hedef ortalama: '+fmtNum(currentCalc.target)+'\n' +
+      'Gerçekleşen ortalama: '+fmtNum(currentCalc.actual)+'\n' +
+      'Hedef prim: '+fmtTL(currentCalc.targetPrim)+'\n' +
+      'Skala ile hesaplanan gerçekleşen prim: '+fmtTL(currentCalc.primTotal)+'\n' +
+      'Prim sapması: '+fmtTL(currentCalc.primDelta)+' ('+fmtPct(currentCalc.primDeltaPct)+')\n' +
+      'Tolerans bandı: ±'+fmtNum(currentCalc.tolerance,1)+'%\n' +
+      'Alarm seviyesi: '+currentCalc.level+'\n' +
+      'Diğer izlenen metrikler (bu dönem ortalamaları): '+(metricLines || 'yok')+'\n\n' +
+      'Bu segmentin son dönemleri:\n' + (recentHistory || 'Geçmiş veri yok, bu ilk kayıt.');
+
+    try{
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      const data = await response.json();
+      const textBlocks = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text);
+      const text = textBlocks.join('\n').trim() || 'Yanıt alınamadı.';
+      $('aiBox').innerHTML = '<div class="ai-box"><span class="ai-tag">AI YORUMU</span><br/>'+text.replace(/</g,'&lt;')+'</div>';
+    }catch(err){
+      $('aiBox').innerHTML = '<div class="ai-box" style="color:var(--crit);">Yorum alınamadı: '+err.message+'</div>';
+    }finally{
+      btn.disabled = false;
+      btn.textContent = origText;
+    }
+  });
+
+  // ---------- history render (filtered to active segment) ----------
+  function renderHistory(){
+    const segHistory = history.filter(h=>h.segment===settings.activeSegment);
+    $('histSub').textContent = 'Segment: ' + settings.activeSegment + ' · ' + segHistory.length + ' dönem kayıtlı';
+
+    const holder = $('histTableHolder');
+    if(segHistory.length===0){
+      holder.innerHTML = '<div class="empty">Bu segment için henüz kayıtlı dönem yok.</div>';
+      $('chartHolder').innerHTML = '';
+      return;
+    }
+    let rows = '';
+    segHistory.slice().reverse().forEach(h=>{
+      const color = {safe:'#4fb286',warn:'#e0a030',crit:'#e0554f'}[h.level];
+      const levelText = {safe:'Dengede',warn:'İzlemede',crit:'Alarm'}[h.level];
+      rows += '<tr><td><span class="badge" style="background:'+color+'" title="'+levelText+'" aria-label="'+levelText+'" role="img"></span></td><td>'+h.label+'</td><td>'+fmtNum(h.actual)+'</td><td>'+fmtTL(h.primTotal)+'</td><td style="color:'+(h.primDelta<=0?'var(--safe)':'var(--crit)')+'">'+fmtPct(h.primDeltaPct)+'</td></tr>';
+    });
+    holder.innerHTML = '<table><thead><tr><th></th><th>Dönem</th><th>Ortalama</th><th>Gerçekleşen Prim</th><th>Prim Sapması</th></tr></thead><tbody>'+rows+'</tbody></table>';
+
+    const labels = segHistory.map(h=>h.label);
+    const actuals = segHistory.map(h=>h.actual);
+    const targets = segHistory.map(h=>h.target);
+    const colors = segHistory.map(h=>({safe:'#4fb286',warn:'#e0a030',crit:'#e0554f'}[h.level]));
+
+    $('chartHolder').innerHTML = drawTrendChart(labels, actuals, targets, colors);
+  }
+
+  // self-contained SVG line chart — no external chart library, so it never fails to load
+  function drawTrendChart(labels, actuals, targets, colors){
+    const n = labels.length;
+    const width = Math.max(320, n*72);
+    const height = 190;
+    const padL=38, padR=14, padT=16, padB=32;
+    const plotW = width-padL-padR, plotH = height-padT-padB;
+
+    const allVals = actuals.concat(targets);
+    let minV = Math.min.apply(null, allVals), maxV = Math.max.apply(null, allVals);
+    if(minV===maxV){ minV -= 1; maxV += 1; }
+    const pad = (maxV-minV)*0.15;
+    minV -= pad; maxV += pad;
+
+    const xFor = i => padL + (n<=1 ? plotW/2 : (i/(n-1))*plotW);
+    const yFor = v => padT + plotH - ((v-minV)/(maxV-minV))*plotH;
+
+    let grid = '';
+    for(let g=0; g<=4; g++){
+      const y = padT + (g/4)*plotH;
+      grid += '<line x1="'+padL+'" y1="'+y+'" x2="'+(padL+plotW)+'" y2="'+y+'" stroke="#232b36" stroke-width="1"/>';
+    }
+
+    const targetPath = 'M ' + targets.map((v,i)=> xFor(i)+' '+yFor(v)).join(' L ');
+    const actualPath = 'M ' + actuals.map((v,i)=> xFor(i)+' '+yFor(v)).join(' L ');
+
+    let points = '';
+    let xLabels = '';
+    actuals.forEach((v,i)=>{
+      points += '<circle cx="'+xFor(i)+'" cy="'+yFor(v)+'" r="4.5" fill="'+colors[i]+'" stroke="#1a212a" stroke-width="1.5"><title>'+labels[i]+': '+fmtNum(v)+'</title></circle>';
+      xLabels += '<text x="'+xFor(i)+'" y="'+(height-10)+'" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#57626f">'+labels[i]+'</text>';
+    });
+
+    const trendLabel = 'Geçmiş trend grafiği: ' + labels.map((l,i)=> l+' '+fmtNum(actuals[i])).join(', ');
+    return '<svg width="'+width+'" height="'+height+'" viewBox="0 0 '+width+' '+height+'" role="img" aria-label="'+trendLabel.replace(/"/g,'&quot;')+'">' +
+      grid +
+      '<text x="4" y="'+(padT+4)+'" font-family="IBM Plex Mono, monospace" font-size="9" fill="#57626f">'+fmtNum(maxV,1)+'</text>' +
+      '<text x="4" y="'+(padT+plotH)+'" font-family="IBM Plex Mono, monospace" font-size="9" fill="#57626f">'+fmtNum(minV,1)+'</text>' +
+      '<path d="'+targetPath+'" fill="none" stroke="#57626f" stroke-width="1.5" stroke-dasharray="4 4"/>' +
+      '<path d="'+actualPath+'" fill="none" stroke="#5b8fd9" stroke-width="2"/>' +
+      points + xLabels +
+      '</svg>';
+  }
+
+  $('clearHistBtn').addEventListener('click', async ()=>{
+    if(!confirm('"'+settings.activeSegment+'" segmentine ait tüm geçmiş dönem kayıtları silinsin mi? (Diğer segmentler etkilenmez)')) return;
+    history = history.filter(h=>h.segment!==settings.activeSegment);
+    await persistHistory();
+    renderHistory();
+  });
+
+  // ---------- PDF export (browser print → "Save as PDF", no external library) ----------
+  let titleBeforePrint = null;
+  window.addEventListener('afterprint', ()=>{
+    if(titleBeforePrint!==null){ document.title = titleBeforePrint; titleBeforePrint = null; }
+  });
+  $('pdfBtn').addEventListener('click', ()=>{
+    if(!currentCalc) return;
+    const now = new Date();
+    $('printMeta').textContent = 'Segment: '+currentCalc.segment+'  ·  Dönem: '+currentCalc.label+'  ·  Rapor tarihi: '+now.toLocaleDateString('tr-TR')+' '+now.toLocaleTimeString('tr-TR');
+    titleBeforePrint = document.title;
+    document.title = ('Prim_Alarm_'+currentCalc.segment+'_'+currentCalc.label).replace(/\s+/g,'_');
+    window.print();
+  });
+
+  loadState();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(node --check \"C:\\\\Users\\\\GLB901~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-GLB90113825-Desktop-Prim-ai\\\\e48acd96-f448-4ff5-bb2d-95b4cb64f138\\\\scratchpad\\\\extracted.js\")",
+      "Bash(node *)",
+      "Skill(run)",
+      "Bash(npx --yes playwright --version)",
+      "Read(//c/Users/GLB901~1/AppData/Local/Temp/claude/C--Users-GLB90113825-Desktop-Prim-ai/e48acd96-f448-4ff5-bb2d-95b4cb64f138/scratchpad/**)",
+      "Bash(npm init *)",
+      "Bash(npm install *)",
+      "Bash(npx playwright *)"
+    ]
+  }
+}
